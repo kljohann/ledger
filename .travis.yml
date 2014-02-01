@@ -7,5 +7,5 @@ before_script:
   - "./acprep opt make --python"
   - "ln -s libledger.so ledger.so"
 script:
-  - "./acprep check"
+  - "./acprep check -- -V"
   - "PYTHONPATH=. python python/demo.py"
