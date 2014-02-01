@@ -254,13 +254,23 @@ include(GNUInstallDirs)
 if(BUILD_LIBRARY)
   add_library(libledger SHARED ${LEDGER_SOURCES} ${PROJECT_SOURCE_DIR}/lib/sha1.cpp)
   add_ledger_library_dependencies(libledger)
-  set_property(TARGET libledger PROPERTY PREFIX "")
+  set_target_properties(libledger PROPERTIES
+    PREFIX ""
+    #INSTALL_NAME_DIR "@executable_path/../lib"
+    INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+    VERSION ${Ledger_VERSION_MAJOR}
+    SOVERSION ${Ledger_VERSION_MAJOR})
 
   add_executable(ledger main.cc global.cc)
   target_link_libraries(ledger libledger)
 
   install(TARGETS libledger DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  install(FILES ${LEDGER_INCLUDES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ledger)
+  install(FILES ${LEDGER_INCLUDES}
+    ${PROJECT_SOURCE_DIR}/lib/sha1.h
+    ${PROJECT_SOURCE_DIR}/lib/utfcpp/source/utf8.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ledger)
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/lib/utfcpp/source/utf8
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ledger)
 else()
   add_executable(ledger
     ${LEDGER_SOURCES} ${PROJECT_SOURCE_DIR}/lib/sha1.cpp main.cc global.cc)
@@ -277,8 +287,18 @@ print(s.get_python_lib(True, prefix=''))"
     CACHE PATH "python module directory (${_TMP_PYTHON_SITE_PACKAGES})")
 
   if (PYTHON_SITE_PACKAGES)
-    # FIXME: symlink would be sufficient
-    set(_ledger_python_module_name "ledger${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    if(WIN32 AND NOT CYGWIN)
+      set(_ledger_python_module_name "ledger.pyd")
+    elseif(CMAKE_HOST_APPLE)
+      set(_ledger_python_module_name "ledger.so")
+    else()
+      set(_ledger_python_module_name "ledger${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    endif()
+
+    # FIXME: symlink would be sufficient:
+    # maybe using install(CODE "...") and
+    # execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ...).
+    # Windows will need a special case due to not supporting symlinks.
     add_custom_command(
       TARGET libledger POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -286,7 +306,6 @@ print(s.get_python_lib(True, prefix=''))"
     install(
       FILES "${CMAKE_BINARY_DIR}/${_ledger_python_module_name}"
       DESTINATION ${PYTHON_SITE_PACKAGES})
-
   else()
     message(WARNING "PYTHON_SITE_PACKAGES not set. Will not install python module.")
   endif()
